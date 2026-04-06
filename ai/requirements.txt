@@ -1,0 +1,11 @@
+mediapipe
+opencv-python
+numpy
+pandas
+torch
+torchvision
+torchaudio
+tensorflowjs
+scikit-learn
+matplotlib
+pynput\nrequests

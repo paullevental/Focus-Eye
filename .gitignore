@@ -1,0 +1,25 @@
+# --- Python (venv) ---
+venv/
+.venv/
+env/
+.env/
+*.pyc
+__pycache__/
+
+# --- React / Node.js ---
+node_modules/
+build/
+dist/
+.eslintcache
+*.log
+
+# --- Local Environment Secrets ---
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+
+# --- IDE Settings ---
+.vscode/
+.idea/
+.DS_Store
