@@ -1,8 +1,0 @@
-[phases.setup]
-nixPkgs = ["jdk17", "maven", "python311", "python311Packages.pip"]
-
-[phases.build]
-cmds = ["chmod +x infra/build.sh", "./infra/build.sh"]
-
-[start]
-cmd = "chmod +x start.sh && ./start.sh"
