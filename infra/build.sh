@@ -11,12 +11,8 @@ chmod +x mvnw
 ./mvnw clean package -DskipTests
 cd ..
 
-echo "--- Setting up Python Environment ---"
-# Railway provides python3 by default
-# We will install dependencies directly into the system environment to save space
-# or use a local venv if preferred. Let's use a local one for safety.
-python3 -m venv venv
-source venv/bin/activate
+echo "--- Setting up Python Dependencies ---"
+# Install dependencies globally in the Railway container
 pip install --upgrade pip
 pip install -r ai/requirements.txt
 

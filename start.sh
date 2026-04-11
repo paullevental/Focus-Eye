@@ -1,4 +1,4 @@
 #!/usr/bin/env bash
-# Final activation of venv and starting the Java application
-source venv/bin/activate
+# Start the Java application
+# We'll use the system python path we set in Railway variables
 java -jar backend/target/FocusEye-0.0.1-SNAPSHOT.jar
