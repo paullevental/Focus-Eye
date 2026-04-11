@@ -7,13 +7,16 @@ cd "$(dirname "$0")/.."
 
 echo "--- Building Java Backend ---"
 cd backend
+chmod +x mvnw
 ./mvnw clean package -DskipTests
 cd ..
 
 echo "--- Setting up Python Environment ---"
-# Create a virtual environment for the AI
-python3 -m venv ai/venv
-source ai/venv/bin/activate
+# Railway provides python3 by default
+# We will install dependencies directly into the system environment to save space
+# or use a local venv if preferred. Let's use a local one for safety.
+python3 -m venv venv
+source venv/bin/activate
 pip install --upgrade pip
 pip install -r ai/requirements.txt
 
