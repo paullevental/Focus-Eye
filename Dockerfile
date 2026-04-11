@@ -1,12 +1,12 @@
-# Stage 1: Build the Java application
-FROM maven:3.8.5-openjdk-17-slim AS build
+# Stage 1: Build the Java application using Maven and Temurin JDK 17
+FROM maven:3.9.6-eclipse-temurin-17 AS build
 WORKDIR /app
 COPY backend/pom.xml backend/
 COPY backend/src backend/src
 RUN mvn -f backend/pom.xml clean package -DskipTests
 
 # Stage 2: Final image with Java, Python, and AI environment
-FROM openjdk:17-slim
+FROM eclipse-temurin:17-jdk
 WORKDIR /app
 
 # Install Python and system dependencies for OpenCV/MediaPipe
@@ -24,7 +24,6 @@ COPY --from=build /app/backend/target/FocusEye-0.0.1-SNAPSHOT.jar app.jar
 COPY ai/ ai/
 
 # Install Python requirements
-# We use --no-cache-dir to save space and opencv-python-headless for cloud stability
 RUN pip3 install --no-cache-dir \
     numpy \
     pandas \
