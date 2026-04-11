@@ -1,13 +1,12 @@
 import cv2
 import mediapipe as mp
-from mediapipe.tasks import python
-from mediapipe.tasks.python import vision
 import numpy as np
 import os
 import time
 
 # Parameters
 SEQUENCE_LENGTH = 30  # Number of frames per sequence
+INPUT_SIZE = 468 * 3  # 468 landmarks * (x, y, z)
 CLASSES = ["Deep Focus", "Partial Distraction", "Absent"]
 AI_DIR = os.path.dirname(os.path.abspath(__file__))
 DATA_PATH = os.path.join(AI_DIR, "data", "raw")
@@ -107,8 +106,12 @@ def collect_data():
 
             if recording or key == ord('s'):
                 landmarks = get_landmarks(frame, current_timestamp_ms)
-                if landmarks is not None:
-                    current_sequence.append(landmarks)
+                
+                # If no landmarks found, use a zero-filled array of the same shape
+                if landmarks is None:
+                    landmarks = np.zeros(INPUT_SIZE)
+                
+                current_sequence.append(landmarks)
                 
                 # If we've hit the sequence length, save it
                 if len(current_sequence) == SEQUENCE_LENGTH:

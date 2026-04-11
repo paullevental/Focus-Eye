@@ -12,7 +12,7 @@ import java.util.List;
 
 @RestController
 @RequestMapping("/api/sessions")
-@CrossOrigin(origins = "http://localhost:5173") // Default Vite port
+@CrossOrigin(origins = "${app.cors.allowed-origins}")
 public class SessionController {
 
     @Autowired
@@ -76,57 +76,56 @@ public class SessionController {
             maxFocusPeriod = null;
             maxDistractionPeriod = null;
             maxAbsentPeriod = null;
-
-            System.out.println("Started session: " + activeSessionId + " for user: " + username);
         } else if ("STOP".equals(status)) {
             if (activeSessionId != null) {
-                // Check if the final streak is the longest
                 updateMaxStreaks();
-
                 StudySession session = repository.findById(activeSessionId).orElse(null);
                 if (session != null) {
                     session.setEndTime(LocalDateTime.now());
-                    
-                    // Convert seconds to minutes for the entity durations if needed, 
-                    // but since the entity uses Integer for duration, it's better to keep it consistent.
-                    // The entity has fields for longest periods.
                     session.setLongestFocusPeriod(maxFocusPeriod);
                     session.setLongestDistractionPeriod(maxDistractionPeriod);
                     session.setLongestAbsentPeriod(maxAbsentPeriod);
-
                     repository.save(session);
-                    System.out.println("Closed session: " + activeSessionId);
                 }
                 this.activeSessionId = null;
             }
+        } else if ("PAUSE".equals(status)) {
+            updateMaxStreaks(); // Close the current streak before pausing
+            currentStreakType = null;
         }
     }
 
     @PostMapping("/score")
     public void recordScore(@RequestBody java.util.Map<String, Object> payload) {
-        if (activeSessionId == null) return;
+        if (activeSessionId == null || "PAUSE".equals(currentStatus)) return;
         
         StudySession session = repository.findById(activeSessionId).orElse(null);
         if (session != null) {
             Double score = Double.valueOf(payload.get("score").toString());
             String type = payload.get("type").toString(); // "DEEP_FOCUS", "PARTIAL", "ABSENT"
             
+            // Add score to history
             session.getFocusScores().add(score);
             
-            // Streak logic
+            // Increment durations by the buffer size (approximately 1 second)
+            if ("DEEP_FOCUS".equals(type)) {
+                session.setDeepFocusDuration((session.getDeepFocusDuration() == null ? 0 : session.getDeepFocusDuration()) + 1);
+            } else if ("PARTIAL".equals(type)) {
+                session.setPartialDistractionDuration((session.getPartialDistractionDuration() == null ? 0 : session.getPartialDistractionDuration()) + 1);
+            } else if ("ABSENT".equals(type)) {
+                session.setAbsentDuration((session.getAbsentDuration() == null ? 0 : session.getAbsentDuration()) + 1);
+            }
+
+            // Streak logic: if the current type is the same as the last frame, increment streak
             if (type.equals(currentStreakType)) {
                 currentStreakSeconds++;
             } else {
+                // Type changed, record the previous max streak if applicable
                 updateMaxStreaks();
                 currentStreakType = type;
                 currentStreakSeconds = 1;
                 currentStreakStart = LocalDateTime.now();
             }
-
-            // Increment durations (approximate by 1 second for each call)
-            if ("DEEP_FOCUS".equals(type)) session.setDeepFocusDuration((session.getDeepFocusDuration() == null ? 0 : session.getDeepFocusDuration()) + 1);
-            else if ("PARTIAL".equals(type)) session.setPartialDistractionDuration((session.getPartialDistractionDuration() == null ? 0 : session.getPartialDistractionDuration()) + 1);
-            else if ("ABSENT".equals(type)) session.setAbsentDuration((session.getAbsentDuration() == null ? 0 : session.getAbsentDuration()) + 1);
             
             repository.save(session);
         }

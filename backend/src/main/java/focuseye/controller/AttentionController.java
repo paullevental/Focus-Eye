@@ -1,7 +1,6 @@
 package focuseye.controller;
 
 import focuseye.dto.LandmarkSequence;
-import focuseye.model.StudySession;
 import focuseye.service.AttentionService;
 import focuseye.repository.StudySessionRepository;
 import jakarta.validation.Valid;
@@ -9,6 +8,8 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Map;
+import focuseye.model.StudySession;
 
 /**
  * REST Controller for the Attention Analysis API.
@@ -16,7 +17,7 @@ import java.util.List;
  */
 @RestController
 @RequestMapping("/api/v1/attention")
-@CrossOrigin(origins = "*") // Allow requests from any origin
+@CrossOrigin(origins = "${app.cors.allowed-origins}")
 public class AttentionController {
 
     @Autowired
@@ -29,7 +30,7 @@ public class AttentionController {
      * Receives a sequence of landmarks and returns the attention prediction.
      */
     @PostMapping("/predict")
-    public StudySession predict(@Valid @RequestBody LandmarkSequence sequence) {
+    public Map<String, Object> predict(@Valid @RequestBody LandmarkSequence sequence) {
         return attentionService.processAttentionData(sequence);
     }
 

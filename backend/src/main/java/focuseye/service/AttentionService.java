@@ -3,8 +3,6 @@ package focuseye.service;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper; 
 import focuseye.dto.LandmarkSequence;
-import focuseye.model.StudySession;
-import focuseye.repository.StudySessionRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -13,13 +11,11 @@ import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
-import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 
 @Service
 public class AttentionService {
-
-    @Autowired
-    private StudySessionRepository sessionRepository;
 
     @Autowired
     private ObjectMapper objectMapper;
@@ -30,7 +26,7 @@ public class AttentionService {
     @Value("${ai.predict.script}")
     private String predictScript;
 
-    public StudySession processAttentionData(LandmarkSequence sequence) {
+    public Map<String, Object> processAttentionData(LandmarkSequence sequence) {
         try {
             // 1. Prepare the prediction
             String prediction = "Absent"; // Default
@@ -72,13 +68,12 @@ public class AttentionService {
                 throw new RuntimeException("Python process failed with exit code: " + exitCode);
             }
 
-            // 6. Save and return the session result
-            StudySession session = new StudySession();
-            session.setClassification(prediction);
-            session.setConfidenceScore(confidence);
-            session.setEndTime(LocalDateTime.now());
+            // 6. Return the prediction result
+            Map<String, Object> result = new HashMap<>();
+            result.put("prediction", prediction);
+            result.put("confidence", confidence);
 
-            return sessionRepository.save(session);
+            return result;
 
         } catch (Exception e) {
             throw new RuntimeException("Failed to process attention data: " + e.getMessage(), e);
