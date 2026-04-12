@@ -19,6 +19,11 @@ const CoverPage: React.FC = () => {
     return saved ? JSON.parse(saved) : { firstName: '', lastName: '' };
   });
 
+  // Save profile to localStorage whenever it changes
+  useEffect(() => {
+    localStorage.setItem('focus-user-profile', JSON.stringify(profile));
+  }, [profile]);
+
   useEffect(() => {
     const initMediaPipe = async () => {
       const filesetResolver = await FilesetResolver.forVisionTasks(
@@ -75,10 +80,12 @@ const CoverPage: React.FC = () => {
   const detectFrame = React.useCallback(async () => {
     if (videoRef.current && landmarkerRef.current && sessionStatus === "START") {
       const startTimeMs = performance.now();
-      const results = landmarkerRef.current.detect_for_video(videoRef.current, startTimeMs);
+      // MediaPipe uses camelCase: detectForVideo
+      const results = landmarkerRef.current.detectForVideo(videoRef.current, startTimeMs);
       
-      if (results.face_landmarks && results.face_landmarks.length > 0) {
-        const flatLandmarks = results.face_landmarks[0].flatMap(l => [l.x, l.y, l.z]);
+      if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+        // Typing the landmark explicitly for tsc
+        const flatLandmarks = results.faceLandmarks[0].flatMap((l: { x: number; y: number; z: number }) => [l.x, l.y, l.z]);
         frameBuffer.current.push(flatLandmarks);
         handlePredict();
       }
@@ -104,6 +111,10 @@ const CoverPage: React.FC = () => {
   };
 
   const handleStartSession = async () => {
+    if (!profile.firstName.trim()) {
+      alert("Please enter your First Name before starting a session.");
+      return;
+    }
     await startCamera();
     updateBackendStatus("START");
   };
