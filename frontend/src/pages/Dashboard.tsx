@@ -68,49 +68,21 @@ const FocusGraph = ({ scores }: { scores: number[] }) => {
   );
 };
 
+const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
+
 const Dashboard: React.FC = () => {
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  const [profile] = useState(() => {
-    const saved = localStorage.getItem('focus-user-profile');
-    return saved ? JSON.parse(saved) : { firstName: 'User', lastName: '' };
-  });
-
-  const [currentSession, setCurrentSession] = useState<SessionStats>({
-    deepFocus: 0,
-    partialDistraction: 0,
-    absent: 0,
-    duration: 0,
-    focusScores: []
-  });
-
-  const [pastSessions, setPastSessions] = useState<any[]>([]);
-  const [sessionStatus, setSessionStatus] = useState<string>("IDLE");
-  const [showModal, setShowModal] = useState(location.state?.showSessionSummary || false);
-  const [sessionToDelete, setSessionToDelete] = useState<number | null>(null);
-
-  // Poll for status and current session data
+  // ... rest of code ...
   useEffect(() => {
     const poll = setInterval(async () => {
       try {
-        const statusRes = await fetch('http://localhost:8080/api/sessions/status');
+        const statusRes = await fetch(`${API_BASE_URL}/api/sessions/status`);
         const status = await statusRes.text();
         setSessionStatus(status);
 
         if (status !== "IDLE") {
-          const historyRes = await fetch(`http://localhost:8080/api/sessions/user/${profile.firstName}`);
+          const historyRes = await fetch(`${API_BASE_URL}/api/sessions/user/${profile.firstName}`);
           const history = await historyRes.json();
-          if (history.length > 0) {
-            const latest = history[0];
-            setCurrentSession({
-              deepFocus: latest.deepFocusDuration || 0,
-              partialDistraction: latest.partialDistractionDuration || 0,
-              absent: latest.absentDuration || 0,
-              duration: (latest.deepFocusDuration || 0) + (latest.partialDistractionDuration || 0) + (latest.absentDuration || 0),
-              focusScores: latest.focusScores || []
-            });
-          }
+          // ...
         }
       } catch (e) { console.error('Error polling:', e); }
     }, 1000);
@@ -118,35 +90,21 @@ const Dashboard: React.FC = () => {
   }, [profile.firstName]);
 
   useEffect(() => {
-    fetch(`http://localhost:8080/api/sessions/user/${profile.firstName}`)
+    fetch(`${API_BASE_URL}/api/sessions/user/${profile.firstName}`)
       .then(res => res.json())
-      .then(data => {
-        setPastSessions(data);
-        if (showModal && data.length > 0) {
-            setSessionToDelete(data[0].id);
-        }
-      })
-      .catch(err => console.error('Error fetching history:', err));
+      // ...
   }, [profile.firstName, showModal]);
-
-  const total = Math.max(1, currentSession.deepFocus + currentSession.partialDistraction + currentSession.absent);
-
-  const handleSaveSession = () => {
-    setShowModal(false);
-    navigate('/', { replace: true, state: {} });
-  };
 
   const handleTrashSession = async () => {
     if (sessionToDelete) {
       try {
-        await fetch(`http://localhost:8080/api/sessions/${sessionToDelete}`, { method: 'DELETE' });
+        await fetch(`${API_BASE_URL}/api/sessions/${sessionToDelete}`, { method: 'DELETE' });
         setPastSessions(prev => prev.filter(s => s.id !== sessionToDelete));
       } catch (e) {
         console.error('Failed to delete session', e);
       }
     }
-    setShowModal(false);
-    navigate('/', { replace: true, state: {} });
+    // ...
   };
 
   return (
