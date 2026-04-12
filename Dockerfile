@@ -10,10 +10,10 @@ FROM eclipse-temurin:17-jdk
 WORKDIR /app
 
 # Install Python and mandatory system dependencies for OpenCV/MediaPipe
-# libgl1 and libglib2.0-0 replace the deprecated libgl1-mesa-glx
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     python3-pip \
+    python3-venv \
     python3-dev \
     libgl1 \
     libglib2.0-0 \
@@ -28,9 +28,11 @@ COPY --from=build /app/backend/target/FocusEye-0.0.1-SNAPSHOT.jar app.jar
 # Copy AI source and model
 COPY ai/ ai/
 
-# Install Python requirements
-# We use --no-cache-dir to stay within Railway's build limits
-RUN pip3 install --no-cache-dir \
+# Create a virtual environment and install AI requirements
+# This avoids the "externally-managed-environment" error
+RUN python3 -m venv /app/venv
+RUN /app/venv/bin/pip install --no-cache-dir --upgrade pip && \
+    /app/venv/bin/pip install --no-cache-dir \
     numpy \
     pandas \
     torch \
@@ -42,7 +44,8 @@ RUN pip3 install --no-cache-dir \
     opencv-python-headless
 
 # Environment variable defaults
-ENV AI_PYTHON_PATH=python3
+# POINTING TO THE VENV PYTHON
+ENV AI_PYTHON_PATH=/app/venv/bin/python
 ENV AI_PREDICT_SCRIPT=ai/predict.py
 ENV PORT=8080
 
