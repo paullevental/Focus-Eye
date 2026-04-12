@@ -2,8 +2,12 @@ package focuseye.dto;
 
 import jakarta.validation.constraints.NotEmpty;
 import jakarta.validation.constraints.Size;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import java.util.List;
 
+@Data
+@NoArgsConstructor
 public class LandmarkSequence {
 
     /**
@@ -13,12 +17,4 @@ public class LandmarkSequence {
     @NotEmpty(message = "The landmark sequence cannot be empty.")
     @Size(min = 30, max = 30, message = "The sequence must contain exactly 30 frames for LSTM prediction.")
     private List<List<Float>> frames;
-
-    public List<List<Float>> getFrames() {
-        return frames;
-    }
-
-    public void setFrames(List<List<Float>> frames) {
-        this.frames = frames;
-    }
 }

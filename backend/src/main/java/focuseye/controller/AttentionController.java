@@ -17,6 +17,7 @@ import focuseye.model.StudySession;
  */
 @RestController
 @RequestMapping("/api/v1/attention")
+@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class AttentionController {
 
     @Autowired
