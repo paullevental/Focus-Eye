@@ -78,19 +78,27 @@ const CoverPage: React.FC = () => {
   };
 
   const detectFrame = React.useCallback(async () => {
-    if (videoRef.current && landmarkerRef.current && sessionStatus === "START") {
-      const startTimeMs = performance.now();
-      // MediaPipe uses camelCase: detectForVideo
-      const results = landmarkerRef.current.detectForVideo(videoRef.current, startTimeMs);
-      
-      if (results.faceLandmarks && results.faceLandmarks.length > 0) {
-        // Typing the landmark explicitly for tsc
-        const flatLandmarks = results.faceLandmarks[0].flatMap((l: { x: number; y: number; z: number }) => [l.x, l.y, l.z]);
-        frameBuffer.current.push(flatLandmarks);
-        handlePredict();
+    if (videoRef.current && 
+        videoRef.current.readyState >= 2 && 
+        videoRef.current.videoWidth > 0 && 
+        landmarkerRef.current && 
+        sessionStatus === "START") {
+      try {
+        const startTimeMs = performance.now();
+        const results = landmarkerRef.current.detectForVideo(videoRef.current, startTimeMs);
+        
+        if (results.faceLandmarks && results.faceLandmarks.length > 0) {
+          const flatLandmarks = results.faceLandmarks[0].flatMap((l: { x: number; y: number; z: number }) => [l.x, l.y, l.z]);
+          frameBuffer.current.push(flatLandmarks);
+          handlePredict();
+        }
+      } catch (e) {
+        console.error("MediaPipe detection error:", e);
       }
     }
-    if (sessionStatus !== "STOP") requestAnimationFrame(detectFrame);
+    if (sessionStatus !== "STOP") {
+      requestAnimationFrame(detectFrame);
+    }
   }, [sessionStatus]);
 
   useEffect(() => {
