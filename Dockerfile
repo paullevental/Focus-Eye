@@ -22,17 +22,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libxrender1 \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy the built JAR from the first stage
-COPY --from=build /app/backend/target/FocusEye-0.0.1-SNAPSHOT.jar app.jar
+# 1. Create the virtual environment
+RUN python3 -m venv /opt/venv
 
-# Copy AI source and model
-COPY ai/ ai/
+# 2. Force the entire container to use the virtual environment by default
+# This makes 'python' and 'pip' point to /opt/venv/bin/ automatically
+ENV PATH="/opt/venv/bin:$PATH"
 
-# Create a virtual environment and install AI requirements
-# This avoids the "externally-managed-environment" error
-RUN python3 -m venv /app/venv
-RUN /app/venv/bin/pip install --no-cache-dir --upgrade pip && \
-    /app/venv/bin/pip install --no-cache-dir \
+# 3. Install AI requirements into the venv (now safe from PEP 668)
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir \
     numpy \
     pandas \
     torch \
@@ -43,12 +42,17 @@ RUN /app/venv/bin/pip install --no-cache-dir --upgrade pip && \
     mediapipe \
     opencv-python-headless
 
-# Environment variable defaults
-# POINTING TO THE VENV PYTHON
-ENV AI_PYTHON_PATH=/app/venv/bin/python
+# Copy the built JAR from the build stage
+COPY --from=build /app/backend/target/FocusEye-0.0.1-SNAPSHOT.jar app.jar
+
+# Copy AI source and model
+COPY ai/ ai/
+
+# Environment variables for the Java Backend
+# Since we added /opt/venv/bin to PATH, 'python3' is now the venv python
+ENV AI_PYTHON_PATH=python3
 ENV AI_PREDICT_SCRIPT=ai/predict.py
 ENV PORT=8080
 
-# Run the application
 EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
