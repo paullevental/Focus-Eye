@@ -105,24 +105,37 @@ const Dashboard: React.FC = () => {
     const poll = setInterval(async () => {
       try {
         const statusRes = await fetch(`${API_BASE_URL}/api/sessions/status`);
+        
+        // Safety Check: If the response is HTML, it means we hit a redirect/404
+        const contentType = statusRes.headers.get("content-type");
+        if (!statusRes.ok || (contentType && contentType.includes("text/html"))) {
+           setSessionStatus("OFFLINE");
+           return;
+        }
+
         const status = await statusRes.text();
         setSessionStatus(status);
 
-        if (status !== "IDLE") {
+        if (status !== "IDLE" && status !== "OFFLINE") {
           const historyRes = await fetch(`${API_BASE_URL}/api/sessions/user/${profile.firstName}`);
-          const history = await historyRes.json();
-          if (history && history.length > 0) {
-            const latest = history[0];
-            setCurrentSession({
-              deepFocus: latest.deepFocusDuration || 0,
-              partialDistraction: latest.partialDistractionDuration || 0,
-              absent: latest.absentDuration || 0,
-              duration: (latest.deepFocusDuration || 0) + (latest.partialDistractionDuration || 0) + (latest.absentDuration || 0),
-              focusScores: latest.focusScores || []
-            });
+          if (historyRes.ok) {
+            const history = await historyRes.json();
+            if (history && history.length > 0) {
+              const latest = history[0];
+              setCurrentSession({
+                deepFocus: latest.deepFocusDuration || 0,
+                partialDistraction: latest.partialDistractionDuration || 0,
+                absent: latest.absentDuration || 0,
+                duration: (latest.deepFocusDuration || 0) + (latest.partialDistractionDuration || 0) + (latest.absentDuration || 0),
+                focusScores: latest.focusScores || []
+              });
+            }
           }
         }
-      } catch (e) { console.error('Error polling:', e); }
+      } catch (e) { 
+        console.error('Error polling:', e);
+        setSessionStatus("OFFLINE");
+      }
     }, 1000);
     return () => clearInterval(poll);
   }, [profile.firstName]);

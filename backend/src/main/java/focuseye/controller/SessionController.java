@@ -2,29 +2,29 @@ package focuseye.controller;
 
 import focuseye.model.StudySession;
 import focuseye.repository.StudySessionRepository;
-
+import focuseye.repository.UserRepository;
+import focuseye.model.User;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.List;
+import java.util.Map;
 
 @RestController
 @RequestMapping("/api/sessions")
-@CrossOrigin(origins = "${app.cors.allowed-origins}")
 public class SessionController {
 
     @Autowired
     private StudySessionRepository repository;
 
     @Autowired
-    private focuseye.repository.UserRepository userRepository;
+    private UserRepository userRepository;
 
     private String currentStatus = "IDLE"; 
     private Long activeSessionId = null;
 
-    // Tracking state for streaks
     private String currentStreakType = null;
     private LocalDateTime currentStreakStart = null;
     private int currentStreakSeconds = 0;
@@ -45,20 +45,20 @@ public class SessionController {
     }
 
     @PostMapping("/status")
-    public void updateStatus(@RequestBody java.util.Map<String, String> payload) {
+    public void updateStatus(@RequestBody Map<String, String> payload) {
         String status = payload.get("status");
         String username = payload.getOrDefault("username", "testuser");
         this.currentStatus = status;
 
         if ("START".equals(status)) {
-            focuseye.model.User user = userRepository.findByUsername(username).orElseGet(() -> {
-                focuseye.model.User newUser = new focuseye.model.User();
+            User user = userRepository.findByUsername(username).orElseGet(() -> {
+                User newUser = new User();
                 newUser.setUsername(username);
                 newUser.setEmail(username + "@FocusEye.com");
                 return userRepository.save(newUser);
             });
 
-            focuseye.model.StudySession newSession = new focuseye.model.StudySession();
+            StudySession newSession = new StudySession();
             newSession.setUser(user);
             newSession.setDeepFocusDuration(0);
             newSession.setPartialDistractionDuration(0);
@@ -66,7 +66,6 @@ public class SessionController {
             newSession = repository.save(newSession);
             this.activeSessionId = newSession.getId();
 
-            // Reset streak tracking
             currentStreakType = null;
             currentStreakStart = LocalDateTime.now();
             currentStreakSeconds = 0;
@@ -90,24 +89,22 @@ public class SessionController {
                 this.activeSessionId = null;
             }
         } else if ("PAUSE".equals(status)) {
-            updateMaxStreaks(); // Close the current streak before pausing
+            updateMaxStreaks();
             currentStreakType = null;
         }
     }
 
     @PostMapping("/score")
-    public void recordScore(@RequestBody java.util.Map<String, Object> payload) {
+    public void recordScore(@RequestBody Map<String, Object> payload) {
         if (activeSessionId == null || "PAUSE".equals(currentStatus)) return;
         
         StudySession session = repository.findById(activeSessionId).orElse(null);
         if (session != null) {
             Double score = Double.valueOf(payload.get("score").toString());
-            String type = payload.get("type").toString(); // "DEEP_FOCUS", "PARTIAL", "ABSENT"
+            String type = payload.get("type").toString();
             
-            // Add score to history
             session.getFocusScores().add(score);
             
-            // Increment durations by the buffer size (approximately 1 second)
             if ("DEEP_FOCUS".equals(type)) {
                 session.setDeepFocusDuration((session.getDeepFocusDuration() == null ? 0 : session.getDeepFocusDuration()) + 1);
             } else if ("PARTIAL".equals(type)) {
@@ -116,11 +113,9 @@ public class SessionController {
                 session.setAbsentDuration((session.getAbsentDuration() == null ? 0 : session.getAbsentDuration()) + 1);
             }
 
-            // Streak logic: if the current type is the same as the last frame, increment streak
             if (type.equals(currentStreakType)) {
                 currentStreakSeconds++;
             } else {
-                // Type changed, record the previous max streak if applicable
                 updateMaxStreaks();
                 currentStreakType = type;
                 currentStreakSeconds = 1;
@@ -165,9 +160,6 @@ public class SessionController {
     public void deleteSession(@PathVariable Long id) {
         if (id != null && repository.existsById(id)) {
             repository.deleteById(id);
-        } else {
-            System.out.println("Session with ID " + id + " not found for deletion.");
         }
     }
-
 }
