@@ -72,7 +72,7 @@ const CoverPage: React.FC = () => {
     }
   };
 
-  const detectFrame = async () => {
+  const detectFrame = React.useCallback(async () => {
     if (videoRef.current && landmarkerRef.current && sessionStatus === "START") {
       const startTimeMs = performance.now();
       const results = landmarkerRef.current.detect_for_video(videoRef.current, startTimeMs);
@@ -84,7 +84,7 @@ const CoverPage: React.FC = () => {
       }
     }
     if (sessionStatus !== "STOP") requestAnimationFrame(detectFrame);
-  };
+  }, [sessionStatus]);
 
   useEffect(() => {
     if (sessionStatus === "START") detectFrame();
@@ -136,7 +136,7 @@ const CoverPage: React.FC = () => {
             />
           </div>
           <div className="input-group">
-            <label style={{ color: '#1d1d1f', fontWeight: '600' }}>Active Keybinds</labelEditorContext>
+            <label style={{ color: '#1d1d1f', fontWeight: '600' }}>Active Keybinds</label>
             <div className="keybind-list" style={{ display: 'flex', gap: '10px', marginTop: '5px' }}>
               <span className="key-tag">S (Start)</span>
               <span className="key-tag">P (Pause)</span>

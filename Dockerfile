@@ -41,9 +41,10 @@ COPY --from=build /app/backend/target/FocusEye-0.0.1-SNAPSHOT.jar app.jar
 COPY ai/ ai/
 
 # Environment variables
-ENV AI_PYTHON_PATH=python3
+ENV AI_PYTHON_EXECUTABLE=python3
 ENV AI_PREDICT_SCRIPT=ai/predict.py
-ENV PORT=8080
+ENV APP_CORS_ALLOWED_ORIGINS=*
 
+# Railway provides PORT, Spring Boot respects SERVER_PORT
 EXPOSE 8080
-ENTRYPOINT ["java", "-jar", "app.jar"]
+ENTRYPOINT ["sh", "-c", "java -jar -Dserver.port=${PORT:-8080} app.jar"]
