@@ -1,333 +1,213 @@
-import React, { useState, useEffect } from 'react';
-import { 
-  BarChart3, 
-  Brain, 
-  AlertCircle, 
-  UserMinus, 
-  Save, 
-  History,
-  ChevronRight,
-  TrendingUp,
-  Play,
-  Trash2
-} from 'lucide-react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Play, Search } from 'lucide-react';
+import { sessionsApi, type StudySession } from '../api/sessions';
+import { useProfile } from '../context/ProfileContext';
+import SessionCard from '../components/SessionCard';
+import UserMenu from '../components/UserMenu';
+import ThemeToggle from '../components/ThemeToggle';
+import StatsHero from '../components/StatsHero';
 import './Dashboard.css';
 
-interface SessionStats {
-  deepFocus: number;
-  partialDistraction: number;
-  absent: number;
-  duration: number;
-  focusScores: number[];
-}
+type SortKey =
+  | 'newest'
+  | 'oldest'
+  | 'longestFocus'
+  | 'shortestFocus'
+  | 'longestTotal';
 
-const FocusGraph = ({ scores }: { scores: number[] }) => {
-  const data = scores && scores.length > 0 ? scores.slice(-20) : [0];
-  const width = 800;
-  const height = 150;
-  const paddingLeft = 40;
-  const paddingRight = 20;
-  const paddingTop = 20;
-  const paddingBottom = 20;
+const SORT_OPTIONS: { value: SortKey; label: string }[] = [
+  { value: 'newest', label: 'Newest' },
+  { value: 'oldest', label: 'Oldest' },
+  { value: 'longestFocus', label: 'Longest focus' },
+  { value: 'shortestFocus', label: 'Shortest focus' },
+  { value: 'longestTotal', label: 'Longest total' },
+];
 
-  const points = data.map((d, i) => {
-    const x = (i / Math.max(1, data.length - 1)) * (width - paddingLeft - paddingRight) + paddingLeft;
-    const y = height - ((d / 100) * (height - paddingTop - paddingBottom) + paddingBottom);
-    return `${x},${y}`;
-  }).join(' ');
+const total = (s: StudySession) =>
+  (s.deepFocusDuration ?? 0) +
+  (s.partialDistractionDuration ?? 0) +
+  (s.absentDuration ?? 0);
 
-  const yLabels = [100, 75, 50, 25, 0];
+const ACTIVE_POLL_MS = 2000;
 
-  return (
-    <div className="graph-wrapper">
-      <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} preserveAspectRatio="none">
-        <defs>
-          <linearGradient id="gradient" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#10b981" stopOpacity="0.2" />
-            <stop offset="100%" stopColor="#10b981" stopOpacity="0" />
-          </linearGradient>
-        </defs>
-        {yLabels.map((label) => {
-          const y = height - ((label / 100) * (height - paddingTop - paddingBottom) + paddingBottom);
-          return (
-            <g key={label}>
-              <line x1={paddingLeft} y1={y} x2={width - paddingRight} y2={y} stroke="#e8e8ed" strokeWidth="1" strokeDasharray="4,4" />
-              <text x={paddingLeft - 10} y={y + 4} textAnchor="end" fill="#86868b" fontSize="10" fontWeight="600">{label}%</text>
-            </g>
-          );
-        })}
-        {data.length > 1 && (
-          <>
-            <path d={`M ${paddingLeft},${height - paddingBottom} ${points} L ${width - paddingRight},${height - paddingBottom} Z`} fill="url(#gradient)" />
-            <polyline fill="none" stroke="#10b981" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" points={points} />
-          </>
-        )}
-      </svg>
-    </div>
-  );
-};
-
-const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8080';
-
-interface PastSession {
-  id: number;
-  startTime: string;
-  deepFocusDuration: number;
-  partialDistractionDuration: number;
-  absentDuration: number;
-  focusScores: number[];
-}
-
-const Dashboard: React.FC = () => {
+export default function Dashboard() {
   const navigate = useNavigate();
-  const location = useLocation();
-  
-  const [profile] = useState(() => {
-    const saved = localStorage.getItem('focus-user-profile');
-    return saved ? JSON.parse(saved) : { firstName: 'Guest', lastName: '' };
-  });
+  const { profile } = useProfile();
+  const username = profile!.firstName; // guard ensures profile exists
 
-  const [sessionStatus, setSessionStatus] = useState("IDLE");
-  const [pastSessions, setPastSessions] = useState<PastSession[]>([]);
-  const [showModal, setShowModal] = useState(location.state?.showSessionSummary || false);
-  const [sessionToDelete, setSessionToDelete] = useState<number | null>(null);
-  
-  const [currentSession, setCurrentSession] = useState<SessionStats>({
-    deepFocus: 0,
-    partialDistraction: 0,
-    absent: 0,
-    duration: 0,
-    focusScores: []
-  });
+  const [sessions, setSessions] = useState<StudySession[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
+  const [activeSession, setActiveSession] = useState<StudySession | null>(null);
+  const [sort, setSort] = useState<SortKey>('newest');
+  const [query, setQuery] = useState('');
+
+  const loadHistory = useCallback(async () => {
+    setLoading(true);
+    try {
+      const list = await sessionsApi.list(username);
+      setSessions(list);
+      setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Failed to load sessions.');
+    } finally {
+      setLoading(false);
+    }
+  }, [username]);
+
+  // Initial history load.
   useEffect(() => {
-    const poll = setInterval(async () => {
-      try {
-        const statusRes = await fetch(`${API_BASE_URL}/api/sessions/status`);
-        
-        // Safety Check: If the response is HTML, it means we hit a redirect/404
-        const contentType = statusRes.headers.get("content-type");
-        if (!statusRes.ok || (contentType && contentType.includes("text/html"))) {
-           setSessionStatus("OFFLINE");
-           return;
-        }
+    void loadHistory();
+  }, [loadHistory]);
 
-        const status = await statusRes.text();
-        setSessionStatus(status);
-
-        if (status !== "IDLE" && status !== "OFFLINE") {
-          const historyRes = await fetch(`${API_BASE_URL}/api/sessions/user/${profile.firstName}`);
-          if (historyRes.ok) {
-            const history = await historyRes.json();
-            if (history && history.length > 0) {
-              const latest = history[0];
-              setCurrentSession({
-                deepFocus: latest.deepFocusDuration || 0,
-                partialDistraction: latest.partialDistractionDuration || 0,
-                absent: latest.absentDuration || 0,
-                duration: (latest.deepFocusDuration || 0) + (latest.partialDistractionDuration || 0) + (latest.absentDuration || 0),
-                focusScores: latest.focusScores || []
-              });
-            }
-          }
-        }
-      } catch (e) { 
-        console.error('Error polling:', e);
-        setSessionStatus("OFFLINE");
-      }
-    }, 1000);
-    return () => clearInterval(poll);
-  }, [profile.firstName]);
-
+  // Light poll for an in-progress session so the resume banner stays accurate.
   useEffect(() => {
-    const fetchHistory = async () => {
+    let cancelled = false;
+    const tick = async () => {
       try {
-        const res = await fetch(`${API_BASE_URL}/api/sessions/user/${profile.firstName}`);
-        const data = await res.json();
-        setPastSessions(data);
-        
-        // If showModal was triggered, we want to show the latest session in the modal
-        if (showModal && data.length > 0) {
-          const latest = data[0];
-          setCurrentSession({
-            deepFocus: latest.deepFocusDuration || 0,
-            partialDistraction: latest.partialDistractionDuration || 0,
-            absent: latest.absentDuration || 0,
-            duration: (latest.deepFocusDuration || 0) + (latest.partialDistractionDuration || 0) + (latest.absentDuration || 0),
-            focusScores: latest.focusScores || []
-          });
-          setSessionToDelete(latest.id);
-        }
-      } catch (e) {
-        console.error('Failed to fetch history:', e);
+        const open = await sessionsApi.active(username);
+        if (!cancelled) setActiveSession(open);
+      } catch {
+        // backend may be transient; surface only on initial history load
       }
     };
-    fetchHistory();
-  }, [profile.firstName, showModal]);
+    void tick();
+    const id = setInterval(tick, ACTIVE_POLL_MS);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
+  }, [username]);
 
-  const handleSaveSession = () => {
-    setShowModal(false);
-    // Session is already saved in the backend during the STOP process
-    // We just need to refresh history which is done via showModal dependency in useEffect
-  };
-
-  const handleTrashSession = async () => {
-    if (sessionToDelete) {
-      try {
-        await fetch(`${API_BASE_URL}/api/sessions/${sessionToDelete}`, { method: 'DELETE' });
-        setPastSessions(prev => prev.filter(s => s.id !== sessionToDelete));
-        setShowModal(false);
-      } catch (e) {
-        console.error('Failed to delete session', e);
-      }
+  const visible = useMemo(() => {
+    const trimmed = query.trim().toLowerCase();
+    let list = sessions;
+    if (trimmed) {
+      list = list.filter((s) => {
+        const haystack = `${s.title ?? ''} ${s.notes ?? ''}`.toLowerCase();
+        return haystack.includes(trimmed);
+      });
     }
-  };
+    const sorted = [...list];
+    switch (sort) {
+      case 'oldest':
+        sorted.sort((a, b) => a.startTime.localeCompare(b.startTime));
+        break;
+      case 'longestFocus':
+        sorted.sort((a, b) => (b.deepFocusDuration ?? 0) - (a.deepFocusDuration ?? 0));
+        break;
+      case 'shortestFocus':
+        sorted.sort((a, b) => (a.deepFocusDuration ?? 0) - (b.deepFocusDuration ?? 0));
+        break;
+      case 'longestTotal':
+        sorted.sort((a, b) => total(b) - total(a));
+        break;
+      case 'newest':
+      default:
+        sorted.sort((a, b) => b.startTime.localeCompare(a.startTime));
+        break;
+    }
+    return sorted;
+  }, [sessions, sort, query]);
 
-  const total = currentSession.duration || 1; // Prevent division by zero
+  const headline = profile?.firstName
+    ? `Welcome back, ${profile.firstName}.`
+    : 'Welcome back.';
 
   return (
-    <div className="dashboard-container">
-      <nav className="dash-nav">
-          <span className="logo-text">FocusEye Analytics</span>
-          <div className="user-profile">
-            <span className="user-name">{profile.firstName} {profile.lastName}</span>
-            <div className="avatar">{profile.firstName.charAt(0)}</div>
+    <div className="dash-shell">
+      <nav className="dash-topbar">
+        <div className="dash-brand">FocusEye</div>
+        <div className="dash-topbar-right">
+          <ThemeToggle />
+          <UserMenu />
         </div>
       </nav>
 
-      <main className="dash-content">
-        <header className="dash-header">
-          <div className="header-info">
-            <div className="status-row-top">
-              <h1>Session Analytics</h1>
-              <div className={`status-pill ${sessionStatus.toLowerCase()}`}>
-                {sessionStatus}
-              </div>
-            </div>
-            <p className="timer-display">{currentSession.duration}s Active • {new Date().toLocaleDateString()}</p>
+      <main className="dash-main">
+        <header className="dash-hero">
+          <div className="dash-hero-text">
+            <h1 className="headline-h1">{headline}</h1>
+            <p>
+              {sessions.length === 0
+                ? 'Start your first session to see it appear here.'
+                : `${sessions.length} session${sessions.length === 1 ? '' : 's'} logged.`}
+            </p>
           </div>
-          <div className="header-actions">
-            <button className="session-btn start" onClick={() => navigate('/setup')}>
-              <Play size={18} />
-              Start New Session
-            </button>
-          </div>
+
+          <button
+            type="button"
+            className="dash-start-btn"
+            onClick={() => navigate('/session')}
+          >
+            <Play size={18} fill="currentColor" />
+            Start Study Session
+          </button>
         </header>
 
-        {showModal && (
-          <div className="modal-overlay">
-            <div className="modal-content">
-              <h2 className="modal-title">Session Complete</h2>
-              <p className="modal-subtitle">Here are your results for the session.</p>
-              
-              <div className="stats-row" style={{ marginTop: '2rem', marginBottom: '1rem' }}>
-                <div className="stat-card focus" style={{ padding: '1rem' }}>
-                  <div className="stat-header"><Brain size={16} /><label>Deep Focus</label></div>
-                  <div className="stat-value" style={{ fontSize: '1.5rem' }}>{currentSession.deepFocus}s</div>
-                </div>
-                <div className="stat-card distracted" style={{ padding: '1rem' }}>
-                  <div className="stat-header"><AlertCircle size={16} /><label>Distracted</label></div>
-                  <div className="stat-value" style={{ fontSize: '1.5rem' }}>{currentSession.partialDistraction}s</div>
-                </div>
-                <div className="stat-card absent" style={{ padding: '1rem' }}>
-                  <div className="stat-header"><UserMinus size={16} /><label>Absent</label></div>
-                  <div className="stat-value" style={{ fontSize: '1.5rem' }}>{currentSession.absent}s</div>
-                </div>
-              </div>
-
-              <div className="chart-card" style={{ padding: '1rem', marginBottom: '2rem' }}>
-                <div className="card-header" style={{ marginBottom: '1rem' }}>
-                  <div className="header-title">
-                    <TrendingUp size={16} color="#10b981" />
-                    <h3 style={{ fontSize: '1rem', margin: 0, fontWeight: 700 }}>Focus Intensity</h3>
-                  </div>
-                </div>
-                <FocusGraph scores={currentSession.focusScores} />
-              </div>
-
-              <div className="modal-actions">
-                  <button className="save-session-btn" onClick={handleSaveSession}>
-                      <Save size={18} /> Save Session
-                  </button>
-                  <button className="trash-session-btn" onClick={handleTrashSession}>
-                      <Trash2 size={18} /> Trash Session
-                  </button>
-              </div>
-            </div>
-          </div>
+        {activeSession && (
+          <button
+            type="button"
+            className="dash-resume-banner"
+            onClick={() => navigate('/session')}
+          >
+            <span className="dash-resume-dot" />
+            <span className="dash-resume-text">
+              You have a {activeSession.status.toLowerCase()} session in progress.
+            </span>
+            <span className="dash-resume-cta">Resume →</span>
+          </button>
         )}
 
-        <div className="main-grid">
-          <section className="left-column">
-            <div className="stats-row">
-              <div className="stat-card focus">
-                <div className="stat-header"><Brain size={20} /><label>Deep Focus</label></div>
-                <div className="stat-value">{currentSession.deepFocus}s</div>
-              </div>
-              <div className="stat-card distracted">
-                <div className="stat-header"><AlertCircle size={20} /><label>Distracted</label></div>
-                <div className="stat-value">{currentSession.partialDistraction}s</div>
-              </div>
-              <div className="stat-card absent">
-                <div className="stat-header"><UserMinus size={20} /><label>Absent</label></div>
-                <div className="stat-value">{currentSession.absent}s</div>
-              </div>
-            </div>
+        <StatsHero sessions={sessions} />
 
-            <div className="chart-card">
-              <div className="card-header">
-                <div className="header-title">
-                  <TrendingUp size={20} color="#10b981" />
-                  <h2>Focus Intensity Graph</h2>
-                </div>
-              </div>
-              <FocusGraph scores={currentSession.focusScores} />
-            </div>
+        <section className="dash-toolbar">
+          <div className="dash-search">
+            <Search size={16} />
+            <input
+              type="text"
+              placeholder="Search by title or notes…"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+            />
+          </div>
 
-            <div className="chart-card">
-              <div className="card-header">
-                <div className="header-title">
-                  <BarChart3 size={20} color="#0071e3" />
-                  <h2>Distribution Timeline</h2>
-                </div>
-              </div>
-              <div className="timeline-bar">
-                <div className="segment focus" style={{width: `${(currentSession.deepFocus / total) * 100}%`}}></div>
-                <div className="segment distracted" style={{width: `${(currentSession.partialDistraction / total) * 100}%`}}></div>
-                <div className="segment absent" style={{width: `${(currentSession.absent / total) * 100}%`}}></div>
-              </div>
-              <div className="timeline-legend">
-                <div className="legend-item"><span className="dot focus"></span> Deep Focus</div>
-                <div className="legend-item"><span className="dot distracted"></span> Partial</div>
-                <div className="legend-item"><span className="dot absent"></span> Absent</div>
-              </div>
-            </div>
-          </section>
+          <div className="dash-filter-row" role="tablist" aria-label="Sort sessions">
+            {SORT_OPTIONS.map((opt) => (
+              <button
+                type="button"
+                key={opt.value}
+                role="tab"
+                aria-selected={sort === opt.value}
+                className={`dash-filter-chip ${sort === opt.value ? 'is-active' : ''}`}
+                onClick={() => setSort(opt.value)}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        </section>
 
-          <section className="right-column">
-            <div className="history-card">
-              <div className="card-header">
-                <div className="header-title"><History size={20} /><h2>Recent History</h2></div>
-              </div>
-              <div className="history-list">
-                {pastSessions.map((session: PastSession) => (
-                  <div key={session.id} className="history-item">
-                    <div className="item-main">
-                      <span className="date">{new Date(session.startTime).toLocaleDateString()}</span>
-                      <span className="duration">{session.deepFocusDuration || 0}s focused</span>
-                    </div>
-                    <ChevronRight size={16} />
-                  </div>
-                ))}
-                {pastSessions.length === 0 && <p className="empty-state">No previous sessions found.</p>}
-              </div>
-            </div>
-          </section>
-        </div>
+        {error && <div className="dash-error">{error}</div>}
+
+        {loading && sessions.length === 0 ? (
+          <div className="dash-empty">Loading sessions…</div>
+        ) : visible.length === 0 ? (
+          <div className="dash-empty">
+            {sessions.length === 0
+              ? 'No sessions yet. Hit Start Study Session above to record your first.'
+              : 'No sessions match that search.'}
+          </div>
+        ) : (
+          <div className="dash-grid">
+            {visible.map((s, i) => (
+              <SessionCard key={s.id} session={s} index={i} />
+            ))}
+          </div>
+        )}
       </main>
     </div>
   );
-};
-
-export default Dashboard;
+}

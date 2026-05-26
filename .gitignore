@@ -14,12 +14,26 @@ dist/
 *.log
 
 # --- Local Environment Secrets ---
+.env
 .env.local
 .env.development.local
 .env.test.local
 .env.production.local
 
+# -- Gathered training data -- #
+data/
+
+
+# --- Java (Maven) ---
+target/
+!.mvn/wrapper/maven-wrapper.jar
+# Removed as it's now environment-variable-safe and needed for Railway
+# backend/src/main/resources/application.properties
+
 # --- IDE Settings ---
 .vscode/
 .idea/
 .DS_Store
+
+# --- Local development notes (not for repo) ---
+DEV_NOTES.md

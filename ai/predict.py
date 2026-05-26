@@ -10,7 +10,7 @@ SEQUENCE_LENGTH = 30
 INPUT_SIZE = 468 * 3
 HIDDEN_SIZE = 64
 NUM_CLASSES = 3
-NUM_LAYERS = 5
+NUM_LAYERS = 2
 CLASSES = ["Deep Focus", "Partial Distraction", "Absent"]
 
 class FocusLSTM(nn.Module):

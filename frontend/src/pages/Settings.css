@@ -1,0 +1,186 @@
+.settings-shell {
+  min-height: 100vh;
+  background: var(--surface-page);
+  color: var(--text);
+}
+
+.settings-topbar {
+  position: sticky;
+  top: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.1rem 2rem;
+  background: var(--surface-overlay);
+  backdrop-filter: saturate(180%) blur(20px);
+  border-bottom: 1px solid var(--border);
+}
+
+.settings-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 99px;
+  padding: 0.4rem 0.85rem;
+  font-weight: 600;
+  color: var(--accent);
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.settings-back:hover { background: var(--surface-muted); border-color: var(--border); }
+
+.settings-main {
+  max-width: 640px;
+  margin: 0 auto;
+  padding: 3rem 2rem 5rem;
+  animation: settings-fade 0.4s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes settings-fade {
+  from { opacity: 0; transform: translateY(8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.settings-header { margin-bottom: 2.25rem; }
+
+.settings-header h1 {
+  font-size: 2.25rem;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--text-h);
+  margin: 0;
+  line-height: 1.15;
+}
+
+.settings-header p {
+  margin: 0.6rem 0 0;
+  color: var(--text-muted);
+}
+
+.settings-card {
+  background: var(--surface-card);
+  border: 1px solid var(--border);
+  border-radius: 20px;
+  padding: 2rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1.35rem;
+  margin-bottom: 1.5rem;
+}
+
+.settings-card.danger {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.settings-row-text h2 {
+  margin: 0 0 0.45rem;
+  font-size: 1.05rem;
+  font-weight: 700;
+  color: var(--text-h);
+}
+
+.settings-row-text p {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 0.92rem;
+  line-height: 1.5;
+}
+
+.settings-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
+
+.settings-field span {
+  font-size: 0.75rem;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.settings-field input {
+  background: var(--surface-muted);
+  border: 1.5px solid transparent;
+  border-radius: 12px;
+  padding: 0.8rem 1rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text);
+  outline: none;
+  transition: border-color 0.15s ease, background 0.15s ease, box-shadow 0.15s ease;
+}
+
+.settings-field input:focus {
+  background: var(--surface-card);
+  border-color: var(--accent);
+  box-shadow: 0 0 0 4px var(--accent-soft);
+}
+
+.settings-actions { display: flex; justify-content: flex-end; }
+
+.settings-save {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--accent);
+  color: var(--text-inverse);
+  border: none;
+  border-radius: 12px;
+  padding: 0.7rem 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, background 0.15s ease;
+}
+
+.settings-save:hover {
+  background: var(--accent-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 8px 18px var(--accent-shadow);
+}
+
+.settings-signout {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--surface-card);
+  color: var(--danger);
+  border: 1px solid var(--danger-border);
+  border-radius: 12px;
+  padding: 0.7rem 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background 0.15s ease, transform 0.15s ease;
+}
+
+.settings-signout:hover { background: var(--danger-soft); transform: translateY(-1px); }
+
+@media (max-width: 720px) {
+  .settings-topbar { padding: 0.85rem 1rem; }
+  .settings-main   { padding: 2rem 1rem 4rem; }
+  .settings-header { margin-bottom: 1.75rem; }
+  .settings-header h1 { font-size: 1.85rem; }
+  .settings-card { padding: 1.5rem; border-radius: 18px; }
+  .settings-actions { justify-content: stretch; }
+  .settings-save { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 540px) {
+  .settings-card.danger { flex-direction: column; align-items: flex-start; }
+  .settings-signout { width: 100%; justify-content: center; }
+}
+
+@media (max-width: 420px) {
+  .settings-topbar { padding: 0.75rem 0.85rem; }
+  .settings-main   { padding: 1.5rem 0.85rem 3.5rem; }
+  .settings-header h1 { font-size: 1.55rem; }
+}

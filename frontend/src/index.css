@@ -1,47 +1,122 @@
+/* ─── Tokens ─────────────────────────────────────────────────
+   Define every surface / text / accent as a CSS variable. Page
+   styles must reference these, never raw hex. The dark theme
+   block below overrides the same names so the whole UI flips
+   from a single attribute on <html>.
+   ──────────────────────────────────────────────────────────── */
 :root {
-  --text: #6b6375;
-  --text-h: #08060d;
-  --bg: #fff;
-  --border: #e5e4e7;
-  --accent: #aa3bff;
-  --accent-bg: rgba(170, 59, 255, 0.1);
-  --accent-border: rgba(170, 59, 255, 0.5);
-  --shadow:
-    rgba(0, 0, 0, 0.1) 0 10px 15px -3px, rgba(0, 0, 0, 0.05) 0 4px 6px -2px;
+  --surface-page: #fbfbfd;
+  --surface-card: #ffffff;
+  --surface-muted: #f5f5f7;
+  --surface-elevated: #ffffff;
+  --surface-overlay: rgba(255, 255, 255, 0.78);
+
+  --border: #e8e8ed;
+  --border-strong: #d2d2d7;
+
+  --text: #1d1d1f;
+  --text-h: #000000;
+  --text-muted: #6e6e73;
+  --text-faint: #86868b;
+  --text-inverse: #ffffff;
+
+  --accent: #0071e3;
+  --accent-hover: #0077ed;
+  --accent-soft: rgba(0, 113, 227, 0.10);
+  --accent-shadow: rgba(0, 113, 227, 0.25);
+
+  --focus: #10b981;
+  --focus-strong: #047857;
+  --focus-soft: #ecfdf5;
+  --focus-shadow: rgba(16, 185, 129, 0.25);
+
+  --warn: #f59e0b;
+  --warn-strong: #b45309;
+  --warn-soft: #fffbeb;
+  --warn-shadow: rgba(245, 158, 11, 0.25);
+
+  --danger: #ef4444;
+  --danger-strong: #b91c1c;
+  --danger-soft: #fef2f2;
+  --danger-border: #fecaca;
+
+  --neutral: #9ca3af;
+
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.04);
+  --shadow-md: 0 12px 24px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 24px 48px rgba(0, 0, 0, 0.08);
+
+  --hero-glow:
+    radial-gradient(circle at 15% 20%, rgba(0, 113, 227, 0.10), transparent 55%),
+    radial-gradient(circle at 85% 80%, rgba(16, 185, 129, 0.10), transparent 55%);
 
   --sans: system-ui, 'Segoe UI', Roboto, sans-serif;
   --heading: system-ui, 'Segoe UI', Roboto, sans-serif;
   --mono: ui-monospace, Consolas, monospace;
 
-  font: 18px/145% var(--sans);
-  letter-spacing: 0.18px;
-  color-scheme: light dark;
+  font: 16px/1.55 var(--sans);
+  letter-spacing: 0.1px;
+  color-scheme: light;
   color: var(--text);
-  background: var(--bg);
+  background: var(--surface-page);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-
-  @media (max-width: 1024px) {
-    font-size: 16px;
-  }
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --text: #9ca3af;
-    --text-h: #f3f4f6;
-    --bg: #16171d;
-    --border: #2e303a;
-    --accent: #c084fc;
-    --accent-bg: rgba(192, 132, 252, 0.15);
-    --accent-border: rgba(192, 132, 252, 0.5);
-    --shadow:
-      rgba(0, 0, 0, 0.4) 0 10px 15px -3px, rgba(0, 0, 0, 0.25) 0 4px 6px -2px;
-  }
+/* ─── Dark theme ──────────────────────────────────────────── */
+[data-theme='dark'] {
+  --surface-page: #0e0e10;
+  --surface-card: #1a1a1c;
+  --surface-muted: #232326;
+  --surface-elevated: #232326;
+  --surface-overlay: rgba(20, 20, 22, 0.78);
+
+  --border: #2c2c30;
+  --border-strong: #3a3a3f;
+
+  --text: #f5f5f7;
+  --text-h: #ffffff;
+  --text-muted: #a1a1a6;
+  --text-faint: #86868b;
+  --text-inverse: #0e0e10;
+
+  --accent: #0a84ff;
+  --accent-hover: #1f97ff;
+  --accent-soft: rgba(10, 132, 255, 0.18);
+  --accent-shadow: rgba(10, 132, 255, 0.35);
+
+  --focus: #34d399;
+  --focus-strong: #6ee7b7;
+  --focus-soft: rgba(52, 211, 153, 0.14);
+  --focus-shadow: rgba(52, 211, 153, 0.30);
+
+  --warn: #fbbf24;
+  --warn-strong: #fcd34d;
+  --warn-soft: rgba(251, 191, 36, 0.14);
+  --warn-shadow: rgba(251, 191, 36, 0.30);
+
+  --danger: #f87171;
+  --danger-strong: #fca5a5;
+  --danger-soft: rgba(248, 113, 113, 0.14);
+  --danger-border: rgba(248, 113, 113, 0.40);
+
+  --neutral: #6b7280;
+
+  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.30);
+  --shadow-md: 0 12px 24px rgba(0, 0, 0, 0.40);
+  --shadow-lg: 0 24px 48px rgba(0, 0, 0, 0.50);
+
+  --hero-glow:
+    radial-gradient(circle at 15% 20%, rgba(10, 132, 255, 0.18), transparent 55%),
+    radial-gradient(circle at 85% 80%, rgba(52, 211, 153, 0.14), transparent 55%);
+
+  color-scheme: dark;
+  background: var(--surface-page);
 }
 
+/* ─── Base ────────────────────────────────────────────────── */
 #root {
   width: 100%;
   margin: 0;
@@ -53,43 +128,39 @@
 
 body {
   margin: 0;
-  background: #ffffff;
-  color: #1d1d1f;
+  background: var(--surface-page);
+  color: var(--text);
+  transition: background 0.25s ease, color 0.25s ease;
 }
 
 .app-wrapper {
   min-height: 100vh;
   width: 100%;
-  background: #ffffff;
+  background: var(--surface-page);
 }
 
-h1,
-h2 {
+h1, h2, h3, h4 {
   font-family: var(--heading);
-  font-weight: 500;
   color: var(--text-h);
-}
-
-h1 {
-  font-size: 56px;
-  letter-spacing: -1.68px;
-  margin: 32px 0;
-  @media (max-width: 1024px) {
-    font-size: 36px;
-    margin: 20px 0;
-  }
-}
-
-h2 {
-  font-size: 24px;
-  line-height: 118%;
-  letter-spacing: -0.24px;
-  margin: 0 0 8px;
-  @media (max-width: 1024px) {
-    font-size: 20px;
-  }
-}
-
-p {
+  letter-spacing: -0.01em;
   margin: 0;
+  line-height: 1.2;
+}
+
+h1 { font-size: 2.25rem; font-weight: 800; letter-spacing: -0.02em; }
+h2 { font-size: 1.25rem; font-weight: 700; }
+h3 { font-size: 1rem;    font-weight: 700; }
+
+p { margin: 0; color: var(--text); }
+
+input, textarea, button { font-family: inherit; }
+
+/* Make theme changes feel intentional, not jarring. */
+.theme-aware,
+.dash-shell,
+.study-shell,
+.detail-shell,
+.settings-shell,
+.signin-shell {
+  transition: background 0.25s ease, color 0.25s ease;
 }
