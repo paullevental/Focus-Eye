@@ -10,6 +10,12 @@ import java.time.LocalDateTime;
 import java.util.HashMap;
 import java.util.Map;
 
+/**
+ * Manages error responses across the entire application. 
+ * It intercepts exceptions thrown by controllers and converts 
+ * them into a consistent JSON format, ensuring the frontend 
+ * receives clear and helpful error messages.
+ */
 @ControllerAdvice
 public class GlobalExceptionHandler {
 
@@ -34,6 +40,15 @@ public class GlobalExceptionHandler {
         body.put("errors", errors);
         
         return new ResponseEntity<>(body, HttpStatus.BAD_REQUEST);
+    }
+
+    @ExceptionHandler(IllegalStateException.class)
+    public ResponseEntity<Map<String, Object>> handleIllegalState(IllegalStateException ex) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("timestamp", LocalDateTime.now());
+        body.put("message", ex.getMessage());
+        body.put("status", HttpStatus.CONFLICT.value());
+        return new ResponseEntity<>(body, HttpStatus.CONFLICT);
     }
 
     @ExceptionHandler(Exception.class)

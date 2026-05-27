@@ -1,33 +1,32 @@
 package focuseye.controller;
 
 import focuseye.dto.LandmarkSequence;
+import focuseye.dto.SessionResponse;
 import focuseye.service.AttentionService;
-import focuseye.repository.StudySessionRepository;
+import focuseye.service.SessionService;
 import jakarta.validation.Valid;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
 import java.util.Map;
-import focuseye.model.StudySession;
 
 /**
- * REST Controller for the Attention Analysis API.
- * This class handles the web-facing part of the application.
+ * Handles requests related to AI focus predictions. 
+ * It receives facial landmark sequences from the frontend and 
+ * returns predictions by communicating with the AI service.
  */
 @RestController
 @RequestMapping("/api/v1/attention")
-@CrossOrigin(originPatterns = "*", allowCredentials = "true")
 public class AttentionController {
 
     @Autowired
     private AttentionService attentionService;
 
     @Autowired
-    private StudySessionRepository sessionRepository;
+    private SessionService sessionService;
 
     /**
-     * Receives a sequence of landmarks and returns the attention prediction.
+     * Run the LSTM on a 30-frame landmark sequence and return the prediction.
      */
     @PostMapping("/predict")
     public Map<String, Object> predict(@Valid @RequestBody LandmarkSequence sequence) {
@@ -35,10 +34,13 @@ public class AttentionController {
     }
 
     /**
-     * Returns all previous study sessions stored in the database.
+     * Admin / debug view of a single user's sessions. The frontend uses
+     * /api/sessions/user/{username}; this exists for parity with the original
+     * v1 namespace. Returns SessionResponse DTOs (not entities) so lazy
+     * collections are safe outside the persistence context.
      */
     @GetMapping("/history")
-    public List<StudySession> getHistory() {
-        return sessionRepository.findAll();
+    public java.util.List<SessionResponse> getHistory(@RequestParam String username) {
+        return sessionService.listForUser(username);
     }
 }

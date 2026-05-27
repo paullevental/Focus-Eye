@@ -1,6 +1,7 @@
 package focuseye.service;
 
 import focuseye.dto.SessionResponse;
+import focuseye.model.FocusCategory;
 import focuseye.model.SessionStatus;
 import focuseye.model.StudySession;
 import focuseye.model.User;
@@ -16,10 +17,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Owns the full session lifecycle: start / pause / resume / stop / score /
- * read / update / delete. Every public method is transactional, so lazy
- * collections (focusScores) are materialized before being mapped into the
- * SessionResponse DTO that we return to the controller layer.
+ * Manages the full lifecycle and business logic of study sessions. 
+ * It handles starting, stopping, and recording scores for sessions,
+ * while also calculating complex focus streaks and ensuring that
+ * all session data is correctly persisted in the database.
  */
 @Service
 @Transactional
@@ -95,31 +96,31 @@ public class SessionService {
         return SessionResponse.from(sessionRepo.save(s));
     }
 
-    public SessionResponse recordScore(Long id, String username, double score, String type) {
-        StudySession s = requireOwned(id, username);
-        if (s.getStatus() != SessionStatus.ACTIVE) {
-            throw new IllegalStateException("Can only record score on an ACTIVE session (was " + s.getStatus() + ")");
+    public SessionResponse recordScore(Long id, String username, double score, FocusCategory type) {
+        StudySession studySession = requireOwned(id, username);
+        if (studySession.getStatus() != SessionStatus.ACTIVE) {
+            throw new IllegalStateException("Can only record score on an ACTIVE session (was " + studySession.getStatus() + ")");
         }
 
-        s.getFocusScores().add(score);
+        studySession.getFocusScores().add(score);
 
         switch (type) {
-            case "DEEP_FOCUS" -> s.setDeepFocusDuration(nz(s.getDeepFocusDuration()) + 1);
-            case "PARTIAL"    -> s.setPartialDistractionDuration(nz(s.getPartialDistractionDuration()) + 1);
-            case "ABSENT"     -> s.setAbsentDuration(nz(s.getAbsentDuration()) + 1);
+            case DEEP_FOCUS -> studySession.setDeepFocusDuration(nz(studySession.getDeepFocusDuration()) + 1);
+            case PARTIAL_DISTRACTION   -> studySession.setPartialDistractionDuration(nz(studySession.getPartialDistractionDuration()) + 1);
+            case ABSENT     -> studySession.setAbsentDuration(nz(studySession.getAbsentDuration()) + 1);
             default -> throw new IllegalArgumentException("Unknown score type: " + type);
         }
 
-        if (type.equals(s.getCurrentStreakType())) {
-            s.setCurrentStreakSeconds(nz(s.getCurrentStreakSeconds()) + 1);
+        if (type.equals(studySession.getCurrentStreakType())) {
+            studySession.setCurrentStreakSeconds(nz(studySession.getCurrentStreakSeconds()) + 1);
         } else {
-            finalizeCurrentStreak(s);
-            s.setCurrentStreakType(type);
-            s.setCurrentStreakStart(LocalDateTime.now());
-            s.setCurrentStreakSeconds(1);
+            finalizeCurrentStreak(studySession);
+            studySession.setCurrentStreakType(type);
+            studySession.setCurrentStreakStart(LocalDateTime.now());
+            studySession.setCurrentStreakSeconds(1);
         }
 
-        return SessionResponse.from(sessionRepo.save(s));
+        return SessionResponse.from(sessionRepo.save(studySession));
     }
 
     public SessionResponse updateMetadata(Long id, String username, String title, String notes) {
@@ -164,7 +165,7 @@ public class SessionService {
     }
 
     private void finalizeCurrentStreak(StudySession s) {
-        String type = s.getCurrentStreakType();
+        FocusCategory type = s.getCurrentStreakType();
         LocalDateTime start = s.getCurrentStreakStart();
         int seconds = nz(s.getCurrentStreakSeconds());
         if (type == null || start == null || seconds == 0) return;
@@ -172,19 +173,19 @@ public class SessionService {
         String period = start.format(PERIOD_FORMATTER) + " - " + LocalDateTime.now().format(PERIOD_FORMATTER);
 
         switch (type) {
-            case "DEEP_FOCUS" -> {
+            case DEEP_FOCUS -> {
                 if (seconds > nz(s.getMaxFocusSeconds())) {
                     s.setMaxFocusSeconds(seconds);
                     s.setLongestFocusPeriod(period);
                 }
             }
-            case "PARTIAL" -> {
+            case PARTIAL_DISTRACTION -> {
                 if (seconds > nz(s.getMaxDistractionSeconds())) {
                     s.setMaxDistractionSeconds(seconds);
                     s.setLongestDistractionPeriod(period);
                 }
             }
-            case "ABSENT" -> {
+            case ABSENT -> {
                 if (seconds > nz(s.getMaxAbsentSeconds())) {
                     s.setMaxAbsentSeconds(seconds);
                     s.setLongestAbsentPeriod(period);

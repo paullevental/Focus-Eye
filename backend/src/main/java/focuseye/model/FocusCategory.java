@@ -2,6 +2,12 @@ package focuseye.model;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 
+/**
+ * Defines the possible focus states for a user.
+ * Each category represents a different level of attention,
+ * allowing the system to classify and track how much time
+ * a user spends in deep focus versus distracted states.
+ */
 public enum FocusCategory {
     DEEP_FOCUS("Deep Focus"),
     PARTIAL_DISTRACTION("Partial Distraction"),
