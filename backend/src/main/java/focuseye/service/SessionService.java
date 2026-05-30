@@ -7,6 +7,8 @@ import focuseye.model.StudySession;
 import focuseye.model.User;
 import focuseye.repository.StudySessionRepository;
 import focuseye.repository.UserRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -25,6 +27,8 @@ import java.util.Optional;
 @Service
 @Transactional
 public class SessionService {
+
+    private static final Logger log = LoggerFactory.getLogger(SessionService.class);
 
     private static final DateTimeFormatter PERIOD_FORMATTER = DateTimeFormatter.ofPattern("h:mm a");
     private static final DateTimeFormatter TITLE_FORMATTER =
@@ -97,12 +101,14 @@ public class SessionService {
     }
 
     public SessionResponse recordScore(Long id, String username, double score, FocusCategory type) {
+        long t0 = System.nanoTime();
         StudySession studySession = requireOwned(id, username);
         if (studySession.getStatus() != SessionStatus.ACTIVE) {
             throw new IllegalStateException("Can only record score on an ACTIVE session (was " + studySession.getStatus() + ")");
         }
 
         studySession.getFocusScores().add(score);
+        int scoresCount = studySession.getFocusScores().size();
 
         switch (type) {
             case DEEP_FOCUS -> studySession.setDeepFocusDuration(nz(studySession.getDeepFocusDuration()) + 1);
@@ -120,7 +126,10 @@ public class SessionService {
             studySession.setCurrentStreakSeconds(1);
         }
 
-        return SessionResponse.from(sessionRepo.save(studySession));
+        SessionResponse response = SessionResponse.from(sessionRepo.save(studySession));
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+        log.info("score id={} took={}ms scores={}", id, ms, scoresCount);
+        return response;
     }
 
     public SessionResponse updateMetadata(Long id, String username, String title, String notes) {

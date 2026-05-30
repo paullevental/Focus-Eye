@@ -43,6 +43,7 @@ public class StudySession {
 
     @ElementCollection
     @CollectionTable(name = "session_focus_scores", joinColumns = @JoinColumn(name = "session_id"))
+    @OrderColumn(name = "score_index")
     @Column(name = "score")
     private java.util.List<Double> focusScores = new java.util.ArrayList<>();
 

@@ -62,11 +62,15 @@ public class AttentionService {
     });
 
     public Map<String, Object> processAttentionData(LandmarkSequence sequence) {
+        long t0 = System.nanoTime();
         lock.lock();
         try {
             ensureAlive();
             sendRequest(sequence);
-            return readResponse();
+            Map<String, Object> result = readResponse();
+            long ms = (System.nanoTime() - t0) / 1_000_000;
+            log.info("predict took={}ms", ms);
+            return result;
         } catch (Exception e) {
             destroyProcess();
             throw new RuntimeException("Prediction failed: " + e.getMessage(), e);
