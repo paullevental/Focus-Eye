@@ -76,6 +76,7 @@ export function ProfileProvider({ children }: { children: ReactNode }) {
   return <ProfileContext.Provider value={value}>{children}</ProfileContext.Provider>;
 }
 
+// eslint-disable-next-line react-refresh/only-export-components -- hook lives with its provider by design
 export function useProfile(): ProfileContextValue {
   const ctx = useContext(ProfileContext);
   if (!ctx) throw new Error('useProfile must be used inside <ProfileProvider>');
@@ -83,6 +84,7 @@ export function useProfile(): ProfileContextValue {
 }
 
 /** Convenience: returns the firstName as the API username, or empty string. */
+// eslint-disable-next-line react-refresh/only-export-components -- hook lives with its provider by design
 export function useUsername(): string {
   const { profile } = useProfile();
   return profile?.firstName ?? '';

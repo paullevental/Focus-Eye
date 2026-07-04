@@ -41,7 +41,7 @@ function computeStreak(sessions: StudySession[]): number {
   const days = new Set(
     sessions.map((s) => startOfDay(new Date(s.startTime)).getTime())
   );
-  let cursor = startOfDay(new Date());
+  const cursor = startOfDay(new Date());
   // If nothing today, start counting from yesterday.
   if (!days.has(cursor.getTime())) {
     cursor.setDate(cursor.getDate() - 1);
