@@ -1,0 +1,68 @@
+name: CI
+
+# When this runs:
+#  - on every pull request (so a broken branch shows a red check before merge)
+#  - on every push to main (a safety net for anything pushed directly)
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # Frontend: type-check, lint, and production build.
+  # Mirrors exactly what Vercel builds, so a green job here means Vercel deploys.
+  # ---------------------------------------------------------------------------
+  frontend:
+    name: Frontend (lint + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      # `npm ci` installs the exact versions from package-lock.json (reproducible,
+      # unlike `npm install` which can update the lockfile).
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Lint
+        run: npm run lint
+
+      # `npm run build` is `tsc -b && vite build` — this is the real type-check.
+      - name: Build
+        run: npm run build
+
+  # ---------------------------------------------------------------------------
+  # Backend: compile, run tests (H2 in-memory), and package the jar.
+  # No Neon secrets needed — the test profile uses H2 (src/test/resources).
+  # ---------------------------------------------------------------------------
+  backend:
+    name: Backend (build + test)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up JDK 17
+        uses: actions/setup-java@v4
+        with:
+          java-version: 17
+          distribution: temurin
+          cache: maven
+
+      # `./mvnw package` compiles, runs the tests, and builds the fat jar.
+      # Tests boot the Spring context against H2, so no database secrets are
+      # required in CI. `-B` = batch mode (no interactive/ANSI noise in logs).
+      - name: Build and test
+        run: ./mvnw -B package
