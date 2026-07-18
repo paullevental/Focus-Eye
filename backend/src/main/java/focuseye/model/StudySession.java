@@ -6,10 +6,8 @@ import lombok.Data;
 import java.time.LocalDateTime;
 
 /**
- * A database entity that stores all information for a study session. 
- * It tracks start and end times, focus durations, and streak records,
- * serving as the primary record for a user's attention history 
- * throughout their study periods.
+ * Database entity for one study session: timing, status, per-state durations,
+ * and streak records. One row = one session.
  */
 @Entity
 @Data

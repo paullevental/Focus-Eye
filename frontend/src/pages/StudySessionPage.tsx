@@ -9,6 +9,7 @@ import {
   type StudySession,
 } from '../api/sessions';
 import { useProfile } from '../context/ProfileContext';
+import { predictWindow } from '../ml/focusModel';
 import FocusGraph from '../components/FocusGraph';
 import ThemeToggle from '../components/ThemeToggle';
 import './StudySessionPage.css';
@@ -19,6 +20,9 @@ import './StudySessionPage.css';
 const FRAME_INTERVAL_MS = 1000 / 30;
 const FEATURE_LENGTH = 468 * 3;
 const ZERO_FRAME: number[] = new Array(FEATURE_LENGTH).fill(0);
+// Safety cap on windows processed per cycle so a stalled tab (e.g. backgrounded,
+// rAF paused) can't force us to score a huge backlog of stale frames at once.
+const MAX_WINDOWS = 8;
 
 type UiStatus = 'IDLE' | 'ACTIVE' | 'PAUSED';
 
@@ -138,21 +142,32 @@ export default function StudySessionPage() {
     if (!sessionId || !username) return;
 
     inflightPredict.current = true;
-    // Drop any pile-up from backend lag so the model always predicts on the
-    // most-recent ~1s window and the counter doesn't burst on recovery.
-    if (frameBuffer.current.length > 30) {
-      frameBuffer.current.splice(0, frameBuffer.current.length - 30);
+    // Score EVERY complete ~1s window captured since the last cycle — not just
+    // the most recent — so no observed second is discarded to backend latency.
+    // The partial remainder (< 30 frames) stays buffered for the next cycle.
+    let windowCount = Math.floor(frameBuffer.current.length / 30);
+    // Safety valve: if the buffer has fallen far behind (e.g. the tab was
+    // backgrounded and rAF stalled), drop the oldest windows so we never score
+    // minute-old frames. In-browser inference keeps up, so this rarely trips.
+    if (windowCount > MAX_WINDOWS) {
+      frameBuffer.current.splice(0, (windowCount - MAX_WINDOWS) * 30);
+      windowCount = MAX_WINDOWS;
     }
-    const framesToSend = frameBuffer.current.splice(0, 30);
+    const windows: number[][][] = [];
+    for (let i = 0; i < windowCount; i++) {
+      windows.push(frameBuffer.current.splice(0, 30));
+    }
     try {
-      const prediction = await sessionsApi.predict(framesToSend);
+      // Inference runs in-browser via onnxruntime-web (see ml/focusModel). The
+      // windows are tiny and score sequentially in single-digit ms each, so no
+      // server round-trip and no Railway CPU ceiling. We still POST the scores.
+      const predictions = await Promise.all(windows.map((w) => predictWindow(w)));
       if (uiStatusRef.current === 'ACTIVE') {
-        const updated = await sessionsApi.score(
-          sessionId,
-          username,
-          focusIntensityFor(prediction.prediction, prediction.confidence),
-          predictionLabelToType(prediction.prediction)
-        );
+        const entries = predictions.map((p) => ({
+          score: focusIntensityFor(p.prediction, p.confidence),
+          type: predictionLabelToType(p.prediction),
+        }));
+        const updated = await sessionsApi.scoreBatch(sessionId, username, entries);
         setLiveSession(updated);
       }
     } catch (e) {

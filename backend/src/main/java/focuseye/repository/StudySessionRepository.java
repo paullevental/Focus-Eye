@@ -9,10 +9,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Interface for database operations on study sessions.
- * It provides methods to retrieve sessions by username, 
- * find active sessions, and ensure that users can only
- * access and modify their own focus data.
+ * Database access for study sessions. Spring writes each query from the method
+ * name. findByIdAndUserUsername is the ownership check used on every mutation.
  */
 public interface StudySessionRepository extends JpaRepository<StudySession, Long> {
 

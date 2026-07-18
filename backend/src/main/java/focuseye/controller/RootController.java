@@ -3,11 +3,7 @@ package focuseye.controller;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Provides basic health check endpoints for the application.
- * It allows monitoring tools and developers to verify that the
- * backend service is online and responding to requests.
- */
+/** Health-check endpoints so uptime monitors can confirm the app is up. */
 @RestController
 public class RootController {
 

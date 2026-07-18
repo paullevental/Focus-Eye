@@ -25,11 +25,6 @@ export interface StudySession {
   longestAbsentPeriod: string | null;
 }
 
-export interface PredictionResponse {
-  prediction: string;
-  confidence: number;
-}
-
 export const sessionsApi = {
   start: (username: string) =>
     apiFetch<StudySession>('/api/sessions/start', {
@@ -59,6 +54,17 @@ export const sessionsApi = {
     apiFetch<StudySession>(`/api/sessions/${id}/score`, {
       method: 'POST',
       body: JSON.stringify({ username, score, type }),
+    }),
+
+  // Record every ~1s window captured since the last cycle in one round-trip.
+  scoreBatch: (
+    id: number,
+    username: string,
+    entries: { score: number; type: ScoreType }[]
+  ) =>
+    apiFetch<StudySession>(`/api/sessions/${id}/scores`, {
+      method: 'POST',
+      body: JSON.stringify({ username, entries }),
     }),
 
   // Returns the user's open (ACTIVE or PAUSED) session, or null if none exists.
@@ -97,12 +103,6 @@ export const sessionsApi = {
       `/api/sessions/${id}?username=${encodeURIComponent(username)}`,
       { method: 'DELETE' }
     ),
-
-  predict: (frames: number[][]) =>
-    apiFetch<PredictionResponse>('/api/v1/attention/predict', {
-      method: 'POST',
-      body: JSON.stringify({ frames }),
-    }),
 };
 
 export function predictionLabelToType(label: string): ScoreType {

@@ -39,3 +39,10 @@ target/
 
 # --- Local development notes (not for repo) ---
 DEV_NOTES.md
+
+# --- Personal / working docs (not for repo) ---
+CLAUDE.md
+changes.md
+resume.md
+*.pdf
+learning/

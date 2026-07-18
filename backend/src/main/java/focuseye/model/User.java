@@ -7,12 +7,7 @@ import lombok.NoArgsConstructor;
 import java.util.List;
 import java.util.ArrayList;
 
-/**
- * A database entity representing a person using the application.
- * It stores identifying information such as a username and email,
- * and maintains a list of all study sessions that belong
- * to that specific individual.
- */
+/** A person using the app: unique username + email, plus their study sessions. */
 @Entity
 @Data
 @NoArgsConstructor

@@ -1,17 +1,31 @@
-"""Long-running prediction daemon.
+"""FocusLSTM model definition + weight loading.
 
-Loads the LSTM once at startup, then serves one prediction per line of
-newline-delimited JSON on stdin. Each prediction is one JSON line on
-stdout, flushed immediately. This replaces the previous one-process-
-per-request design, which paid ~2-3s of Python startup + torch import
-on every call (catastrophic on Railway's shared CPU).
+Inference now runs in the browser via onnxruntime-web (see frontend/src/ml/
+focusModel.ts); the backend no longer calls this file at runtime. It remains the
+source of truth for the model architecture and normalization, and is imported by
+export_onnx.py to produce focus_lstm.onnx and by train_lstm.py at training time.
 """
+import os
+
+# Pin thread counts BEFORE importing torch. On a throttled shared-CPU container
+# (Railway Hobby), os.cpu_count() reports the host's full core count, so torch's
+# OpenMP/MKL backends spawn that many threads and thrash them across the tiny CPU
+# slice we actually get — turning a ~15M-MAC forward pass into multiple seconds.
+# These env vars only take effect if set before torch is imported.
+os.environ.setdefault("OMP_NUM_THREADS", "1")
+os.environ.setdefault("MKL_NUM_THREADS", "1")
+
 import torch
 import torch.nn as nn
 import numpy as np
-import sys
-import json
-import os
+
+# Belt-and-suspenders: also pin at the torch API level. set_num_threads is always
+# safe; set_num_interop_threads must run before any parallel work, so guard it.
+torch.set_num_threads(1)
+try:
+    torch.set_num_interop_threads(1)
+except Exception:
+    pass
 
 # Model parameters (must match train_lstm.py)
 SEQUENCE_LENGTH = 30
@@ -39,18 +53,22 @@ class FocusLSTM(nn.Module):
 
 
 def normalize_landmarks(landmarks_array):
-    """Recenter all landmarks on the nose tip (landmark index 1)."""
-    nose_x = landmarks_array[3]
-    nose_y = landmarks_array[4]
-    nose_z = landmarks_array[5]
-    normalized = []
-    for i in range(0, len(landmarks_array), 3):
-        normalized.extend([
-            landmarks_array[i] - nose_x,
-            landmarks_array[i + 1] - nose_y,
-            landmarks_array[i + 2] - nose_z,
-        ])
-    return np.array(normalized)
+    """Recenter all landmarks on the nose tip (landmark index 1).
+
+    Vectorized: reshape the flat (1404,) frame to (468, 3), subtract the nose
+    row (landmark index 1), flatten back. Numerically identical to the old
+    per-element Python loop but ~100x faster.
+    """
+    pts = np.asarray(landmarks_array, dtype=np.float32).reshape(-1, 3)
+    pts = pts - pts[1]
+    return pts.reshape(-1)
+
+
+def normalize_batch(frames):
+    """Recenter a full (seq, 1404) batch on each frame's own nose tip."""
+    pts = np.asarray(frames, dtype=np.float32).reshape(len(frames), -1, 3)
+    pts = pts - pts[:, 1:2, :]
+    return pts.reshape(len(frames), -1)
 
 
 def load_model():
@@ -69,41 +87,3 @@ def load_model():
     return model, device
 
 
-def predict_one(model, device, frames_data):
-    raw_frames = np.array(frames_data, dtype=np.float32)
-    normalized = np.array([normalize_landmarks(f) for f in raw_frames])
-    x = torch.tensor(normalized).unsqueeze(0).to(device)
-    with torch.no_grad():
-        outputs = model(x)
-        probabilities = torch.softmax(outputs, dim=1)
-        confidence, predicted = torch.max(probabilities, 1)
-        return {
-            "prediction": CLASSES[predicted.item()],
-            "confidence": float(confidence.item()),
-        }
-
-
-def serve():
-    """Read one JSON request per line of stdin, write one JSON response per line of stdout."""
-    try:
-        model, device = load_model()
-    except Exception as e:
-        sys.stdout.write(json.dumps({"error": f"startup: {e}"}) + "\n")
-        sys.stdout.flush()
-        return
-
-    for line in sys.stdin:
-        line = line.strip()
-        if not line:
-            continue
-        try:
-            request = json.loads(line)
-            result = predict_one(model, device, request["frames"])
-            sys.stdout.write(json.dumps(result) + "\n")
-        except Exception as e:
-            sys.stdout.write(json.dumps({"error": str(e)}) + "\n")
-        sys.stdout.flush()
-
-
-if __name__ == "__main__":
-    serve()

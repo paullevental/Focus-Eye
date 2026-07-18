@@ -1,5 +1,6 @@
 package focuseye.service;
 
+import focuseye.dto.ScoredWindow;
 import focuseye.dto.SessionResponse;
 import focuseye.model.FocusCategory;
 import focuseye.model.SessionStatus;
@@ -19,10 +20,8 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Manages the full lifecycle and business logic of study sessions. 
- * It handles starting, stopping, and recording scores for sessions,
- * while also calculating complex focus streaks and ensuring that
- * all session data is correctly persisted in the database.
+ * Business logic for study sessions: start/pause/resume/stop, recording scores,
+ * streak tracking, and persistence. Every write runs in a transaction.
  */
 @Service
 @Transactional
@@ -102,34 +101,64 @@ public class SessionService {
 
     public SessionResponse recordScore(Long id, String username, double score, FocusCategory type) {
         long t0 = System.nanoTime();
-        StudySession studySession = requireOwned(id, username);
-        if (studySession.getStatus() != SessionStatus.ACTIVE) {
-            throw new IllegalStateException("Can only record score on an ACTIVE session (was " + studySession.getStatus() + ")");
-        }
+        StudySession studySession = requireActive(id, username);
 
-        studySession.getFocusScores().add(score);
+        applyScore(studySession, score, type);
         int scoresCount = studySession.getFocusScores().size();
-
-        switch (type) {
-            case DEEP_FOCUS -> studySession.setDeepFocusDuration(nz(studySession.getDeepFocusDuration()) + 1);
-            case PARTIAL_DISTRACTION   -> studySession.setPartialDistractionDuration(nz(studySession.getPartialDistractionDuration()) + 1);
-            case ABSENT     -> studySession.setAbsentDuration(nz(studySession.getAbsentDuration()) + 1);
-            default -> throw new IllegalArgumentException("Unknown score type: " + type);
-        }
-
-        if (type.equals(studySession.getCurrentStreakType())) {
-            studySession.setCurrentStreakSeconds(nz(studySession.getCurrentStreakSeconds()) + 1);
-        } else {
-            finalizeCurrentStreak(studySession);
-            studySession.setCurrentStreakType(type);
-            studySession.setCurrentStreakStart(LocalDateTime.now());
-            studySession.setCurrentStreakSeconds(1);
-        }
 
         SessionResponse response = SessionResponse.from(sessionRepo.save(studySession));
         long ms = (System.nanoTime() - t0) / 1_000_000;
         log.info("score id={} took={}ms scores={}", id, ms, scoresCount);
         return response;
+    }
+
+    /**
+     * Record a batch of ~1s windows in one transaction and a single save (keeps
+     * the fast append path). Each entry is a real second of capture, so each
+     * adds +1s. Lets the frontend stop discarding windows buffered during
+     * backend latency.
+     */
+    public SessionResponse recordScores(Long id, String username, List<ScoredWindow> entries) {
+        long t0 = System.nanoTime();
+        StudySession studySession = requireActive(id, username);
+        if (entries == null || entries.isEmpty()) {
+            return SessionResponse.from(studySession);
+        }
+
+        for (ScoredWindow entry : entries) {
+            applyScore(studySession, entry.score(), entry.type());
+        }
+        int scoresCount = studySession.getFocusScores().size();
+
+        SessionResponse response = SessionResponse.from(sessionRepo.save(studySession));
+        long ms = (System.nanoTime() - t0) / 1_000_000;
+        log.info("scores id={} took={}ms entries={} scores={}", id, ms, entries.size(), scoresCount);
+        return response;
+    }
+
+    /**
+     * Apply one scored window in memory (no save): append the score, add 1s to
+     * the matching total, and extend or restart the current streak. Shared by
+     * recordScore and recordScores so the two paths can't drift.
+     */
+    private void applyScore(StudySession s, double score, FocusCategory type) {
+        s.getFocusScores().add(score);
+
+        switch (type) {
+            case DEEP_FOCUS -> s.setDeepFocusDuration(nz(s.getDeepFocusDuration()) + 1);
+            case PARTIAL_DISTRACTION -> s.setPartialDistractionDuration(nz(s.getPartialDistractionDuration()) + 1);
+            case ABSENT -> s.setAbsentDuration(nz(s.getAbsentDuration()) + 1);
+            default -> throw new IllegalArgumentException("Unknown score type: " + type);
+        }
+
+        if (type.equals(s.getCurrentStreakType())) {
+            s.setCurrentStreakSeconds(nz(s.getCurrentStreakSeconds()) + 1);
+        } else {
+            finalizeCurrentStreak(s);
+            s.setCurrentStreakType(type);
+            s.setCurrentStreakStart(LocalDateTime.now());
+            s.setCurrentStreakSeconds(1);
+        }
     }
 
     public SessionResponse updateMetadata(Long id, String username, String title, String notes) {
@@ -171,6 +200,16 @@ public class SessionService {
         return sessionRepo.findByIdAndUserUsername(id, username)
                 .orElseThrow(() -> new IllegalArgumentException(
                         "Session " + id + " not found for user " + username));
+    }
+
+    // requireOwned plus an ACTIVE-status guard. Shared by the score-recording paths.
+    private StudySession requireActive(Long id, String username) {
+        StudySession s = requireOwned(id, username);
+        if (s.getStatus() != SessionStatus.ACTIVE) {
+            throw new IllegalStateException(
+                    "Can only record score on an ACTIVE session (was " + s.getStatus() + ")");
+        }
+        return s;
     }
 
     private void finalizeCurrentStreak(StudySession s) {

@@ -6,6 +6,9 @@ torch
 torchvision
 torchaudio
 tensorflowjs
+onnx
+onnxruntime
+onnxscript
 scikit-learn
 matplotlib
 pynput\nrequests

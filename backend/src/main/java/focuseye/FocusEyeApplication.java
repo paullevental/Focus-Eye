@@ -8,9 +8,8 @@ import org.springframework.web.servlet.config.annotation.CorsRegistry;
 import org.springframework.web.servlet.config.annotation.WebMvcConfigurer;
 
 /**
- * The entry point for the FocusEye Spring Boot application.
- * It configures the main application context and establishes
- * global CORS settings to allow communication with the frontend.
+ * Spring Boot entry point. Also defines the single global CORS rule that lets
+ * the frontend call this API (allowed origins come from app.cors.allowed-origins).
  */
 @SpringBootApplication
 public class FocusEyeApplication {

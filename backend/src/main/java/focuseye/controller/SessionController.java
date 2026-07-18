@@ -1,5 +1,7 @@
 package focuseye.controller;
 
+import focuseye.dto.ScoreBatchRequest;
+import focuseye.dto.ScoredWindow;
 import focuseye.dto.SessionResponse;
 import focuseye.dto.UpdateSessionRequest;
 import focuseye.model.FocusCategory;
@@ -12,12 +14,7 @@ import org.springframework.web.bind.annotation.*;
 import java.util.List;
 import java.util.Map;
 
-/**
- * This class handles all network requests related to study sessions.
- * It provides endpoints to start, pause, resume, and stop sessions.
- * It acts as the entry point for the frontend to communicate with
- * the backend logic for managing a user's focus history.
- */
+/** HTTP endpoints for study sessions: start, pause, resume, stop, score, edit, delete. */
 @RestController
 @RequestMapping("/api/sessions")
 public class SessionController {
@@ -75,6 +72,19 @@ public class SessionController {
         double score = Double.parseDouble(body.get("score").toString());
         FocusCategory type = FocusCategory.fromString(String.valueOf(body.get("type")));
         return sessions.recordScore(id, username, score, type);
+    }
+
+    /**
+     * Batch version of {@link #score}: record every ~1s window from one
+     * round-trip, in order. Parses each entry's category before handing off.
+     */
+    @PostMapping("/{id}/scores")
+    public SessionResponse scores(@PathVariable Long id, @RequestBody ScoreBatchRequest body) {
+        List<ScoredWindow> entries = body.getEntries() == null ? List.of()
+                : body.getEntries().stream()
+                        .map(e -> new ScoredWindow(e.getScore(), FocusCategory.fromString(e.getType())))
+                        .toList();
+        return sessions.recordScores(id, body.getUsername(), entries);
     }
 
     @PutMapping("/{id}")

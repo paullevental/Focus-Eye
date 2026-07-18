@@ -13,10 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * A data transfer object that sends session details to the frontend.
- * It simplifies the complex database model into a format that
- * the user's browser can easily display while keeping internal
- * database implementation details hidden from the public API.
+ * What the API returns for a session. Maps the entity to a browser-friendly
+ * shape and hides internal DB details, so the schema can change without
+ * breaking the API.
  */
 @Data
 @Builder
